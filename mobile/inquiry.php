@@ -1,8 +1,8 @@
 <?php
 error_reporting("E_NOTICE");
 
-$username 	= 'contoh';
-$password 	= 'contoh';
+$username 	= '';
+$password 	= '';
 $curl       = curl_init();
 $url        = "http://localhost/api-dimo/api/inquiry";
 
@@ -32,7 +32,7 @@ curl_setopt_array($curl, array(
     CURLOPT_RETURNTRANSFER => 1,
     CURLOPT_URL => $url,
     CURLOPT_USERPWD => $username.":".$password,
-    CURLOPT_TIMEOUT => 5, 
+    CURLOPT_TIMEOUT => 25, 
     CURLOPT_POST => 1,    
     CURLOPT_SSL_VERIFYHOST => 1,
     CURLOPT_SSL_VERIFYPEER => false,
@@ -46,8 +46,8 @@ curl_setopt_array($curl, array(
 $resp   = curl_exec($curl);
 $status_code = curl_getinfo($curl,CURLINFO_HTTP_CODE);
 $error_no = curl_errno($curl);
-echo "\nresult";
-print_r($resp);
+// echo "\nresult";
+// print_r($resp);
 // Check if any error occurred
 if(curl_errno($curl))
 {

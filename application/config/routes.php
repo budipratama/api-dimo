@@ -49,9 +49,10 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 | Examples:	my-controller/index	-> my_controller/index
 |		my-controller/my-method	-> my_controller/my_method
 */
-$route['default_controller'] = 'welcome';
-$route['api/inquiry'] = 'Api/action_inquiry';
-$route['api/sleep'] = 'Api/action_sleep';
-$route['api/tmoney-sign-in'] = 'Api/action_tmoney_login';
-$route['404_override'] = '';
-$route['translate_uri_dashes'] = FALSE;
+$route['default_controller'] 	= 'welcome';
+$route['api/inquiry'] 			= 'Api/action_inquiry';
+$route['api/sleep'] 			= 'Api/action_sleep';
+$route['simulation/inquiry'] 	= 'Mobile/action_inquiry';
+$route['api/tmoney-sign-in'] 	= 'Api/action_tmoney_login';
+$route['404_override'] 			= '';
+$route['translate_uri_dashes'] 	= FALSE;

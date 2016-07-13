@@ -30,9 +30,9 @@ class Api extends CI_Controller
 		echo "</pre>";
 	}
 	
-	public function log($message,$path)
+	public function log($message)
 	{
-		error_log($message,3,PATH_LOG.'logs/inquiry'.date('Y-m-d').'.log');	
+		error_log($message,3,PATH_LOG.'transaction_'.date('Y-m-d').'.log');	
 	}
 
 	public function json_skeleton($val)
@@ -137,6 +137,12 @@ class Api extends CI_Controller
 		    $this->response($response);
 		}
 
+		if (SHOW_DEBUG_API) 
+		{
+			echo "\n\nResult GENERATE INVOICE\n";
+			echo $resp;
+		}
+
 		curl_close($curl);
 		return json_decode($resp,true);
 	}
@@ -151,15 +157,15 @@ class Api extends CI_Controller
     	if (!isset($_SERVER['PHP_AUTH_USER']) && !isset($_SERVER['PHP_AUTH_PW'])) 
     	{
 	    	// recorded transaction failed in log (username, password and ip)
-    		$this->log(date('Y-m-d H:i:s')." IP : {$_SERVER['HTTP_HOST']} \tUsername : $user \tPassword : $pass\t\n",PATH_LOG.'logs/inquiry'.date('Y-m-d').'.log');
+    		$this->log(date('Y-m-d H:i:s')." IP : {$_SERVER['HTTP_HOST']} \tUsername : $user \tPassword : $pass\t\n");
 		} 
 		else 
 		{
-			if ($_SERVER['PHP_AUTH_USER'] == "contoh" && $_SERVER['PHP_AUTH_PW'] == "contoh") 
+			if ($_SERVER['PHP_AUTH_USER'] == USERNAME_API && $_SERVER['PHP_AUTH_PW'] == PASSWORD_API) 
 			{
 				$requestBody  = file_get_contents('php://input');
 	    		// recorded transaction in log (username, password and request body)
-	    		$this->log(date('Y-m-d H:i:s')." IP : {$_SERVER['HTTP_HOST']} \tUsername : $user \tPassword : $pass\t Parameter in mobile : $requestBody\t\n",PATH_LOG.'logs/inquiry'.date('Y-m-d').'.log');
+	    		$this->log(date('Y-m-d H:i:s')." IP : {$_SERVER['HTTP_HOST']} \tUsername : $user \tPassword : $pass\t Parameter in mobile : $requestBody\t\n");
 
 	    		// convert JSON into array
 				$input 		= json_decode($requestBody, TRUE ); 
@@ -186,7 +192,8 @@ class Api extends CI_Controller
 				}
 
 				// $de62 = "                                        ".trim($content['discAmount']).trim($content['NOC']).trim($content['discType']).trim($content['loyaltyName']).trim($content['pointsRedeemed']).trim($content['amountRedeemed']);
-				$de62 = "                                        ".trim($content['discAmount']).trim($content['NOC'])."                    "."                                        "."000000000000"."000000000000";
+				$de62 = "                                        ".trim($content['discAmount']).trim($content['NOC']).$content['discType'].$content['loyaltyName'].$content['pointsRedeemed'].$content['amountRedeemed'];
+				// echo "jumlah length de62 : ".strlen($de62);die();
 				$invoiceID = $this->getInvoiceID();
 
 				// request JSON Format for dimmo
@@ -199,18 +206,23 @@ class Api extends CI_Controller
 								["id" => "DE48" , "value" => trim($content['userAPIKey'])], // User Api Key
 								["id" => "DE54" , "value" => trim($content['tipAmount'])], // Tipping Amount
 								["id" => "DE61" , "value" => trim($invoiceID['invoiceId'])], // API GENERATE INVOICE 
-								["id" => "DE62" , "value" => trim($de62)], // white space 40 character + Discount Amount + Number of Coupons + Discount Type + Loyalty Name + Points Redeemed + Amount Redeemed
+								["id" => "DE62" , "value" => $de62], // white space 40 character + Discount Amount + Number of Coupons + Discount Type + Loyalty Name + Points Redeemed + Amount Redeemed
 								// ["id" => "DE98" , "value" => trim($content['prodCode'])], // Product Code								
 								["id" => "DE98" , "value" => 12], // Product Code								
 				]; 
-				$data       = ["type"=>"requestInquiry","contents"=>$contents];
-				echo "\n\n";
-
-				echo $data_string = json_encode($data,true);
-				$this->log(date('Y-m-d H:i:s')." Request body inquiry : $data_string\t\n",PATH_LOG.'logs/inquiry'.date('Y-m-d').'.log');
+				$data        = ["type"=>"requestInquiry","contents"=>$contents];
+				$data_string = json_encode($data,true);
 				
-				$url = "https://sandbox.flashiz.co.id/oauth/v1/as/request/AppOauth?ID=AUTHREQ&trxid=requestInquiry&host_id=TLKMIDJA";
-				$curl = curl_init();
+				if (SHOW_DEBUG_API) 
+				{
+					echo "\n\nRequest body inquiry\n";
+					echo json_encode($data,JSON_PRETTY_PRINT);
+				}
+				
+				$this->log(date('Y-m-d H:i:s')." Request body inquiry : $data_string\t\n",PATH_LOG.'logs/transaction__'.date('Y-m-d').'.log');
+				
+				$url 	= "https://sandbox.flashiz.co.id/oauth/v1/as/request/AppOauth?ID=AUTHREQ&trxid=requestInquiry&host_id=TLKMIDJA";
+				$curl 	= curl_init();
 
 				curl_setopt_array($curl, array(
 				    CURLOPT_RETURNTRANSFER => 1,
@@ -226,7 +238,7 @@ class Api extends CI_Controller
 				    ),
 				    CURLOPT_POSTFIELDS => $data_string,
 				));
-				
+
 				// Check if any error occurred
 				if(curl_errno($curl))
 				{
@@ -234,50 +246,90 @@ class Api extends CI_Controller
 				}
 
 				$resp   = curl_exec($curl);
-				echo "\nresponse inquiry\n";
-				echo $resp;
+				$error_no = curl_errno($curl);
+			
+				// Check if any error occurred
+				if(curl_errno($curl) == 28)
+				{
+					$response = ["status" => "failed", "message" => "OPERATION TIME OUT", "err_no" => 28];
+					$this->response($response);
+				}
 
-				$this->userName = $content['userName'];
-				$this->password = $content['password'];
-				$this->paidAmmount = $content['paidAmmount'];
+				curl_close($curl);
+				
+				$result = json_decode($resp,true);
+
+				if (SHOW_DEBUG_API) 
+				{
+					echo "\n\nResponse inquiry\n";
+					echo json_encode($result,JSON_PRETTY_PRINT);
+				}
+				
+				$this->userName 	= $content['userName'];
+				$this->password 	= $content['password'];
+				$this->paidAmmount 	= $content['paidAmmount'];
 
 				$login = $this->action_login_tmoney();
-				$this->action_topup_balance($login['user']['idTmoney'],$login['user']['idFusion'],$login['user']['token']);
+
+				$resp_topup = $this->action_topup_balance($login['user']['idTmoney'],$login['user']['idFusion'],$login['user']['token']);
+				$this->action_acknowledgment($result['items'][6]['value'],$result['items'][3]['value'],$result['items'][4]['value'],$result['items'][5]['value'],$resp_topup['transactionID'],$content['merchantName'],$content['userAPIKey'],$content['tipAmount'],$invoiceID['invoiceId'],$content['discAmount'],$content['NOC'],$de62);
 			}
 			else
 			{
-	    		$this->log(date('Y-m-d H:i:s')." IP : {$_SERVER['HTTP_HOST']} \tUsername : $user \tPassword : $pass\t\n",PATH_LOG.'logs/inquiry'.date('Y-m-d').'.log');
+	    		$this->log(date('Y-m-d H:i:s')." IP : {$_SERVER['HTTP_HOST']} \tUsername : $user \tPassword : $pass\t\n");
 				$this->authentication();
 			}
 			
 		}
     }
-    
-    public function action_acknowledgment()
+
+
+    /**
+     * [action_acknowledgment description]
+     * 
+     * @param  [type] $de15 Settlement Date
+     * @param  [type] $de11 System Trace Audit Number
+     * @param  [type] $de12 Local Transaction Time
+     * @param  [type] $de13 Local Transaction Date
+     * @param  [type] $de37 Retrieval Reference Number
+     * @param  [type] $de43 Acceptor Name - QR Payment value is Merchant Name
+     * @param  [type] $de48 User API Key
+     * @param  [type] $de54 Tipping Amount. With 2 (two) decimal places.
+     * @param  [type] $de61 Reserved – Private, information of the invoice ID.
+     * @param  [type] $de62
+     * @return [type]
+     */
+    public function action_acknowledgment($de15,$de11,$de12,$de13,$de37,$de43,$de48,$de54,$de61,$de62)
     {
     	// request JSON Format for dimmo
 		$contents = [
-						["id" => "DE4", "value" => trim()],
-						["id" => "DE7", "value" => trim()],
-						["id" => "DE11", "value" => trim()],
-						["id" => "DE12", "value" => trim()],
-						["id" => "DE13", "value" => trim()],
-						["id" => "DE15", "value" => trim()],
-						["id" => "DE32", "value" => trim()],
-						["id" => "DE33", "value" => trim()],
-						["id" => "DE37", "value" => trim()],
-						["id" => "DE43", "value" => trim()],
-						["id" => "DE48", "value" => trim()],
-						["id" => "DE54", "value" => trim()],
-						["id" => "DE61", "value" => trim()],
-						["id" => "DE62", "value" => trim()],
-						["id" => "DE98", "value" => trim()],
+						["id" => "DE4", "value" => trim($this->paidAmmount)],
+						["id" => "DE7", "value" => date('mdHis')],
+						["id" => "DE11", "value" => trim($de11)],
+						["id" => "DE12", "value" => trim($de12)],
+						["id" => "DE13", "value" => trim($de13)],
+						["id" => "DE15", "value" => trim($de15)],
+						["id" => "DE32", "value" => "912"],
+						["id" => "DE33", "value" => "912"],
+						["id" => "DE37", "value" => trim($de37)],
+						["id" => "DE43", "value" => trim($de43)],
+						["id" => "DE48", "value" => trim($de48)],
+						["id" => "DE54", "value" => trim($de54)],
+						["id" => "DE61", "value" => trim($de61)],
+						["id" => "DE62", "value" => $de62],
+						["id" => "DE98", "value" => 12],
 		];
 
 		$data 	= ['type' => "requestPayment","contents" => $contents];
 
 		$data_string = json_encode($data,true);
     	
+    	if (SHOW_DEBUG_API) 
+		{
+			echo "\n\nRequest body acknowledgment\n";
+			echo json_encode($data,JSON_PRETTY_PRINT);	
+		}
+
     	$url 	= "https://sandbox.flashiz.co.id/oauth/v1/as/request/AppOauth?ID=AUTHREQ&trxid=requestPayment&host_id=TLKMIDJA";
 		$curl 	= curl_init();
 
@@ -296,8 +348,24 @@ class Api extends CI_Controller
 			CURLOPT_POSTFIELDS => $data_string,
 		));
 		$resp   = curl_exec($curl);
-		echo "\nresponse inquiry\n";
-		echo $resp;
+
+		// Check if any error occurred
+		if(curl_errno($curl) == 28)
+		{
+			$response = ["status" => "failed", "message" => "OPERATION TIME OUT", "err_no" => 28];
+			$this->response($response);
+		}
+
+		curl_close($curl);
+
+		$result = json_decode($resp,true);
+
+		if (SHOW_DEBUG_API) 
+		{
+			echo "\n\nResponse acknowledgment\n";
+			echo json_encode($result,JSON_PRETTY_PRINT);	
+		}
+
     }
 
     public function action_topup_balance($idTmoney,$idFusion,$token)
@@ -323,9 +391,9 @@ class Api extends CI_Controller
 			CURLOPT_SSL_VERIFYPEER 	=> false,
 		));
 		// log post TOPUP BALANCE
-		$this->log(date('Y-m-d H:i:s')."[TOPUP BALANCE TMONEY] POST idTmoney: $idTmoney, idFusion : $idFusion, token : $token}, destAccount : $userName, amount : $this->paidAmmount \t\n",PATH_LOG.'logs/inquiry'.date('Y-m-d').'.log');
-		$resp   = curl_exec($curl);
-		$error_no = curl_errno($curl);
+		$this->log(date('Y-m-d H:i:s')."[TOPUP BALANCE TMONEY] POST idTmoney: $idTmoney, idFusion : $idFusion, token : $token}, destAccount : $userName, amount : $this->paidAmmount \t\n");
+		$resp   	= curl_exec($curl);
+		$error_no 	= curl_errno($curl);
 			
 			// Check if any error occurred
 		if(curl_errno($curl) == 28)
@@ -335,15 +403,23 @@ class Api extends CI_Controller
 		}
 
 		curl_close($curl);
-		echo "\nresponse API TOPUP BALANCE \n";
-		echo $resp;
-		echo "\nencode json\n";
+		
+		
+		$this->log(date('Y-m-d H:i:s')."[TOPUP BALANCE TMONEY] Response : $resp \t\n");
 		$result = json_decode($resp,true);
-		print_r($result);
+
+		if (SHOW_DEBUG_API) 
+		{
+			echo "\n\nResponse API TOPUP BALANCE \n";
+			echo json_encode($result,JSON_PRETTY_PRINT);
+		}
+
 		// statement for failed
 		if ($result['resultCode'] != "0" || $result['resultCode'] != "00") {
 				# gagal
 		}
+
+		return $result;
     }
 
     public function action_login_tmoney()
@@ -368,8 +444,9 @@ class Api extends CI_Controller
 
 		$resp   = curl_exec($curl);
 		$error_no = curl_errno($curl);
+
 		// log post login tmoney
-		$this->log(date('Y-m-d H:i:s')."[Login TMONEY] POST userName: {$this->userName}, password : {$this->password}\t\n",PATH_LOG.'logs/inquiry'.date('Y-m-d').'.log');
+		$this->log(date('Y-m-d H:i:s')."[Login TMONEY] POST userName: {$this->userName}, password : {$this->password}\t\n");
 			
 		// Check if any error occurred
 		if(curl_errno($curl) == 28)
@@ -379,15 +456,19 @@ class Api extends CI_Controller
 		}
 
 		curl_close($curl);
-		echo "\nresponse API LOGIN \n";
-		echo $resp;
-		echo "\nencode json\n";
+		
+		
 		$result = json_decode($resp,true);
 
 		// log response
-		$this->log(date('Y-m-d H:i:s')."[Login TMONEY] Response $resp \t\n",PATH_LOG.'logs/inquiry'.date('Y-m-d').'.log');
-			
-		print_r($result);
+		$this->log(date('Y-m-d H:i:s')."[Login TMONEY] Response $resp \t\n");
+		
+		if (SHOW_DEBUG_API) 
+		{
+			echo "\n\nResponse API LOGIN \n";
+			echo json_encode($result,JSON_PRETTY_PRINT);
+		}
+
 		// statement for failed
 		if ($result['resultCode'] != "0" || $result['resultCode'] != "00") {
 				# gagal
