@@ -2,10 +2,7 @@
 error_reporting("E_NOTICE");
 
 class Mobile extends CI_Controller{
-	public function index()
-	{
-		echo "hai";
-	}
+	
 	public function action_inquiry()
 	{
 		header('Content-Type: application/json');
@@ -15,10 +12,11 @@ class Mobile extends CI_Controller{
 		$url        = "http://localhost/api-dimo/api/inquiry";
 
 		$contents   = [
-		                ["id" => "paidAmmount", "value" => "10"],// Paid Payment
+		                ["id" => "paidAmmount", "value" => "1000"],// Paid Payment
 		                ["id" => "merchantName", "value"=> "Salon Meicy"],//Card acceptor name/location – QR payment value is store name a
 		                ["id" => "userAPIKey", "value"=> "9f5da2b9200d20fe048d76e91d7038885cad9042"],// User API Key
 		                ["id" => "tipAmount", "value"=> "0"],//Tipping Amount. With 2 (two) decimal places. 
+		                // ["id" => "tipAmount", "value"=> "000000000000000000"],//Tipping Amount. With 2 (two) decimal places. 
 		                ["id" => "discAmount", "value"=> "000000000000"], // Discount Amount length 12 
 		                ["id" => "NOC", "value"=> "000"],// number of coupons length 3
 		                ["id" => "discType", "value"=> "                    "],// discount type -> Left justified, padded with space 20
@@ -33,7 +31,7 @@ class Mobile extends CI_Controller{
 
 		$data       = ["type"=>"inquiry","contents"=>$contents];
 		$data_string = json_encode($data,true);
-		echo "request body\n";
+		echo "request body mobile\n";
 		echo json_encode($data,JSON_PRETTY_PRINT);
 		// echo json_encode($data_string);die();
 		$curl = curl_init();

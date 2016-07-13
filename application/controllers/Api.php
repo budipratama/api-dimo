@@ -116,7 +116,7 @@ class Api extends CI_Controller
 
 	public function getInvoiceID()
 	{
-		$url 	= "https://sandbox.flashiz.co.id/api/createInvoice?apiKey=7a5d03ff2c7f38c22e304899476035b42252d707&amount=1350&pinCode=1234&invoiceTagStart=true";
+		$url 	= "https://sandbox.flashiz.co.id/api/createInvoice?apiKey=7a5d03ff2c7f38c22e304899476035b42252d707&amount={$this->paidAmmount}&pinCode=1234&invoiceTagStart=true";
 		$curl 	= curl_init();
 
 		curl_setopt_array($curl, array(
@@ -134,6 +134,7 @@ class Api extends CI_Controller
 		if(curl_errno($curl) == 28)
 		{
 			$response = ["status" => "failed", "message" => "OPERATION TIME OUT", "err_no"=>28];
+			$this->log(date('Y-m-d H:i:s')."[WARNING] Operation time out when generate invoice\t\n");
 		    $this->response($response);
 		}
 
@@ -157,7 +158,7 @@ class Api extends CI_Controller
     	if (!isset($_SERVER['PHP_AUTH_USER']) && !isset($_SERVER['PHP_AUTH_PW'])) 
     	{
 	    	// recorded transaction failed in log (username, password and ip)
-    		$this->log(date('Y-m-d H:i:s')." IP : {$_SERVER['HTTP_HOST']} \tUsername : $user \tPassword : $pass\t\n");
+    		$this->log(date('Y-m-d H:i:s')."[LOGIN][WARNING] IP : {$_SERVER['HTTP_HOST']} \tUsername : $user \tPassword : $pass\t\n");
 		} 
 		else 
 		{
@@ -165,7 +166,8 @@ class Api extends CI_Controller
 			{
 				$requestBody  = file_get_contents('php://input');
 	    		// recorded transaction in log (username, password and request body)
-	    		$this->log(date('Y-m-d H:i:s')." IP : {$_SERVER['HTTP_HOST']} \tUsername : $user \tPassword : $pass\t Parameter in mobile : $requestBody\t\n");
+	    		$this->log(date('Y-m-d H:i:s')."[LOGIN] IP : {$_SERVER['HTTP_HOST']} \tUsername : $user \tPassword : $pass\t\n");
+	    		$this->log(date('Y-m-d H:i:s')."[REQUEST] Parameter in mobile : $requestBody\t\n");
 
 	    		// convert JSON into array
 				$input 		= json_decode($requestBody, TRUE ); 
@@ -174,6 +176,7 @@ class Api extends CI_Controller
 				if ($this->json_skeleton($input['type']) == false) 
 				{
 					$response = ['status'=>'failed','message' => 'JSON Format Incorret'];
+					$this->log(date('Y-m-d H:i:s')."[FAILED] JSON Format Incorret\t\n");
 					$this->response($response);
 				}
 				$content = [];
@@ -184,7 +187,7 @@ class Api extends CI_Controller
 					if ($this->json_skeleton($value['id']) == false) 
 					{
 						$response = ['status'=>'failed','message' => 'JSON Format Incorret'];
-
+						$this->log(date('Y-m-d H:i:s')."[FAILED] JSON Format Incorret\t\n");
 						$this->response($response);
 					}
 
@@ -194,17 +197,20 @@ class Api extends CI_Controller
 				// $de62 = "                                        ".trim($content['discAmount']).trim($content['NOC']).trim($content['discType']).trim($content['loyaltyName']).trim($content['pointsRedeemed']).trim($content['amountRedeemed']);
 				$de62 = "                                        ".trim($content['discAmount']).trim($content['NOC']).$content['discType'].$content['loyaltyName'].$content['pointsRedeemed'].$content['amountRedeemed'];
 				// echo "jumlah length de62 : ".strlen($de62);die();
-				$invoiceID = $this->getInvoiceID();
+				$this->userName 	= $content['userName'];
+				$this->password 	= $content['password'];
+				$this->paidAmmount 	= $content['paidAmmount'];
 
+				$invoiceID = $this->getInvoiceID();
 				// request JSON Format for dimmo
 				$contents 	= [
-								["id" => "DE4" , "value" => trim($content['paidAmmount'])], // Paid Amount 
+								["id" => "DE4" , "value" => $this->add_decimal(trim($content['paidAmmount']))], // Paid Amount 
 								["id" => "DE7" , "value" => date('mdHis')], // Transmission Date and Time (GMT) date MMDDhhmmss
 								["id" => "DE32" , "value" => "912"], // Acquiring institution identification code
 								["id" => "DE33" , "value" => "912"], // Forwarding institution code
 								["id" => "DE43" , "value" => trim($content['merchantName'])], // Merchant Name
 								["id" => "DE48" , "value" => trim($content['userAPIKey'])], // User Api Key
-								["id" => "DE54" , "value" => trim($content['tipAmount'])], // Tipping Amount
+								["id" => "DE54" , "value" => $this->add_decimal(trim($content['tipAmount']))], // Tipping Amount
 								["id" => "DE61" , "value" => trim($invoiceID['invoiceId'])], // API GENERATE INVOICE 
 								["id" => "DE62" , "value" => $de62], // white space 40 character + Discount Amount + Number of Coupons + Discount Type + Loyalty Name + Points Redeemed + Amount Redeemed
 								// ["id" => "DE98" , "value" => trim($content['prodCode'])], // Product Code								
@@ -219,7 +225,7 @@ class Api extends CI_Controller
 					echo json_encode($data,JSON_PRETTY_PRINT);
 				}
 				
-				$this->log(date('Y-m-d H:i:s')." Request body inquiry : $data_string\t\n",PATH_LOG.'logs/transaction__'.date('Y-m-d').'.log');
+				$this->log(date('Y-m-d H:i:s')."[INQUIRY] Request body inquiry : $data_string\t\n",PATH_LOG.'logs/transaction__'.date('Y-m-d').'.log');
 				
 				$url 	= "https://sandbox.flashiz.co.id/oauth/v1/as/request/AppOauth?ID=AUTHREQ&trxid=requestInquiry&host_id=TLKMIDJA";
 				$curl 	= curl_init();
@@ -239,12 +245,7 @@ class Api extends CI_Controller
 				    CURLOPT_POSTFIELDS => $data_string,
 				));
 
-				// Check if any error occurred
-				if(curl_errno($curl))
-				{
-				    echo 'Curl error: '.curl_errno($curl) . curl_error($curl);
-				}
-
+				
 				$resp   = curl_exec($curl);
 				$error_no = curl_errno($curl);
 			
@@ -252,6 +253,7 @@ class Api extends CI_Controller
 				if(curl_errno($curl) == 28)
 				{
 					$response = ["status" => "failed", "message" => "OPERATION TIME OUT", "err_no" => 28];
+					$this->log(date('Y-m-d H:i:s')."[WARNING] Operation time out when hit inquiry\t\n");
 					$this->response($response);
 				}
 
@@ -265,14 +267,19 @@ class Api extends CI_Controller
 					echo json_encode($result,JSON_PRETTY_PRINT);
 				}
 				
-				$this->userName 	= $content['userName'];
-				$this->password 	= $content['password'];
-				$this->paidAmmount 	= $content['paidAmmount'];
-
-				$login = $this->action_login_tmoney();
-
-				$resp_topup = $this->action_topup_balance($login['user']['idTmoney'],$login['user']['idFusion'],$login['user']['token']);
-				$this->action_acknowledgment($result['items'][6]['value'],$result['items'][3]['value'],$result['items'][4]['value'],$result['items'][5]['value'],$resp_topup['transactionID'],$content['merchantName'],$content['userAPIKey'],$content['tipAmount'],$invoiceID['invoiceId'],$content['discAmount'],$content['NOC'],$de62);
+				// response negatif
+				if ($result['items'][9]['value'] != "00") 
+				{
+					$response = ["status" => "failed", "message" => "Response Negatif", "err_no" => $result['items'][9]['value']];
+					$this->log(date('Y-m-d H:i:s')."[INQUIRY] Response Negatif error {$result['items'][9]['value']}\t\n");
+					$this->response($response);
+				}
+				
+				$login 		= $this->action_user_login_tmoney();
+				// $this->action_dimo_login_tmoney();
+				$resp_topup = $this->action_topup_balance($login['user']['idTmoney'],$login['user']['idFusion'],$login['user']['token'],$content['pinCode']);
+				
+				$this->action_acknowledgment($result['items'][6]['value'],$result['items'][3]['value'],$result['items'][4]['value'],$result['items'][5]['value'],$resp_topup['reffNo'],$content['merchantName'],$content['userAPIKey'],$content['tipAmount'],$invoiceID['invoiceId'],$content['discAmount'],$content['NOC'],$de62);
 			}
 			else
 			{
@@ -303,7 +310,7 @@ class Api extends CI_Controller
     {
     	// request JSON Format for dimmo
 		$contents = [
-						["id" => "DE4", "value" => trim($this->paidAmmount)],
+						["id" => "DE4", "value" => $this->add_decimal(trim($this->paidAmmount))],
 						["id" => "DE7", "value" => date('mdHis')],
 						["id" => "DE11", "value" => trim($de11)],
 						["id" => "DE12", "value" => trim($de12)],
@@ -312,9 +319,10 @@ class Api extends CI_Controller
 						["id" => "DE32", "value" => "912"],
 						["id" => "DE33", "value" => "912"],
 						["id" => "DE37", "value" => trim($de37)],
+						// ["id" => "DE37", "value" => 109876543210],
 						["id" => "DE43", "value" => trim($de43)],
 						["id" => "DE48", "value" => trim($de48)],
-						["id" => "DE54", "value" => trim($de54)],
+						["id" => "DE54", "value" => $this->add_decimal(trim($de54))],
 						["id" => "DE61", "value" => trim($de61)],
 						["id" => "DE62", "value" => $de62],
 						["id" => "DE98", "value" => 12],
@@ -347,12 +355,14 @@ class Api extends CI_Controller
 			),
 			CURLOPT_POSTFIELDS => $data_string,
 		));
+
 		$resp   = curl_exec($curl);
 
 		// Check if any error occurred
 		if(curl_errno($curl) == 28)
 		{
 			$response = ["status" => "failed", "message" => "OPERATION TIME OUT", "err_no" => 28];
+			$this->log(date('Y-m-d H:i:s')."[WARNING] Operation time out when hit acknowledgment\t\n");
 			$this->response($response);
 		}
 
@@ -366,10 +376,19 @@ class Api extends CI_Controller
 			echo json_encode($result,JSON_PRETTY_PRINT);	
 		}
 
+		// response negatif
+		if ($result['items'][9]['value'] != "00") 
+		{
+			$response = ["status" => "failed", "message" => "Response Negatif", "err_no" => $result['items'][9]['value']];
+			$this->log(date('Y-m-d H:i:s')."[ACKNOWLEDGMENT] Response Negatif error {$result['items'][9]['value']}\t\n");
+			$this->response($response);
+		}
+
     }
 
-    public function action_topup_balance($idTmoney,$idFusion,$token)
+    public function action_topup_balance($idTmoney,$idFusion,$token,$pin)
     {
+		// step 1
 		$url_api_login = "https://prodapi-app.tmoney.co.id/api/topup-balance";
 
 		$curl 	= curl_init();
@@ -378,14 +397,16 @@ class Api extends CI_Controller
 			CURLOPT_RETURNTRANSFER 	=> 1,
 			CURLOPT_URL 			=> $url_api_login,
 			CURLOPT_TIMEOUT 		=> 25, 
+			CURLOPT_POST => 1,
 			CURLOPT_POSTFIELDS => array(
 			    'transactionType' => 1,
 			    'terminal' => "ANDROID-TMONEY",
 			    'idTmoney' => trim($idTmoney),
 			    'idFusion' => trim($idFusion),
 			    'token' => trim($token),
-			    'destAccount' => trim($this->userName),
-			    'amount' => trim($this->paidAmmount),
+			    'destAccount' => "ekoselaluceria@gmail.com",
+			    // 'amount' => trim($this->paidAmmount),
+			    'amount' => 5,//trim($this->paidAmmount),
 			),
 			CURLOPT_SSL_VERIFYHOST 	=> 1,
 			CURLOPT_SSL_VERIFYPEER 	=> false,
@@ -399,7 +420,8 @@ class Api extends CI_Controller
 		if(curl_errno($curl) == 28)
 		{
 			$response = ["status" => "failed", "message" => "OPERATION TIME OUT", "err_no" => 28];
-			   $this->response($response);
+			$this->log(date('Y-m-d H:i:s')."[WARNING] Operation time out when topup balance\t\n");
+			$this->response($response);
 		}
 
 		curl_close($curl);
@@ -416,13 +438,71 @@ class Api extends CI_Controller
 
 		// statement for failed
 		if ($result['resultCode'] != "0" || $result['resultCode'] != "00") {
-				# gagal
+			$response = ["status" => "failed", "message" => $result['resultDesc'], "err_no" => $result['resultCode']];
+			$this->log(date('Y-m-d H:i:s')."[WARNING][TOPUP-BALANCE] Error {$result['resultCode']}, Message {$result['resultDesc']}\t\n");
+			$this->response($response);
 		}
 
+		// step 2
+		$curl 	= curl_init();
+
+		curl_setopt_array($curl, array(
+			CURLOPT_RETURNTRANSFER 	=> 2,
+			CURLOPT_URL 			=> $url_api_login,
+			CURLOPT_TIMEOUT 		=> 25,
+			CURLOPT_POST => 1, 
+			CURLOPT_POSTFIELDS => array(
+			    'transactionType' => 2,
+			    'terminal' => "ANDROID-TMONEY",
+			    'idTmoney' => trim($idTmoney),
+			    'idFusion' => trim($idFusion),
+			    'token' => trim($token),
+			    'destAccount' => "ekoselaluceria@gmail.com",
+			    // 'amount' => trim($this->paidAmmount),
+			    'amount' => 5,//trim($this->paidAmmount),
+			    'pin' => $pin,//trim($this->paidAmmount),
+			    'transactionID' => $result['transactionID'],//trim($this->paidAmmount),
+			    'refNo' => $result['refNo'],//trim($this->paidAmmount),
+			),
+			CURLOPT_SSL_VERIFYHOST 	=> 1,
+			CURLOPT_SSL_VERIFYPEER 	=> false,
+		));
+		
+		// log post TOPUP BALANCE
+		$this->log(date('Y-m-d H:i:s')."[TOPUP BALANCE TMONEY] POST idTmoney: $idTmoney, idFusion : $idFusion, token : $token}, destAccount : $userName, amount : $this->paidAmmount \t\n");
+		$resp   	= curl_exec($curl);
+		$error_no 	= curl_errno($curl);
+			
+			// Check if any error occurred
+		if(curl_errno($curl) == 28)
+		{
+			$response = ["status" => "failed", "message" => "OPERATION TIME OUT", "err_no" => 28];
+			$this->log(date('Y-m-d H:i:s')."[WARNING] Operation time out when topup balance\t\n");
+			$this->response($response);
+		}
+
+		curl_close($curl);
+		
+		
+		$this->log(date('Y-m-d H:i:s')."[TOPUP BALANCE TMONEY] Response : $resp \t\n");
+		$result = json_decode($resp,true);
+
+		if (SHOW_DEBUG_API) 
+		{
+			echo "\n\nResponse API TOPUP BALANCE STEP 2\n";
+			echo json_encode($result,JSON_PRETTY_PRINT);
+		}
+
+		// statement for failed
+		if ($result['resultCode'] != "0" || $result['resultCode'] != "00") {
+			$response = ["status" => "failed", "message" => $result['resultDesc'], "err_no" => $result['resultCode']];
+			$this->log(date('Y-m-d H:i:s')."[WARNING][TOPUP-BALANCE] Error {$result['resultCode']}, Message {$result['resultDesc']}\t\n");
+			$this->response($response);
+		}
 		return $result;
     }
 
-    public function action_login_tmoney()
+    public function action_user_login_tmoney()
     {
     	// hit API LOGIN TMONEY
 		$url_api_login = "https://prodapi-app.tmoney.co.id/api/sign-in";
@@ -446,12 +526,13 @@ class Api extends CI_Controller
 		$error_no = curl_errno($curl);
 
 		// log post login tmoney
-		$this->log(date('Y-m-d H:i:s')."[Login TMONEY] POST userName: {$this->userName}, password : {$this->password}\t\n");
+		$this->log(date('Y-m-d H:i:s')."[LOGIN][TMONEY] POST userName: {$this->userName}, password : {$this->password}\t\n");
 			
 		// Check if any error occurred
 		if(curl_errno($curl) == 28)
 		{
 			$response = ["status" => "failed", "message" => "OPERATION TIME OUT", "err_no" => 28];
+			$this->log(date('Y-m-d H:i:s')."[WARNING] Operation time out when login at tmoney\t\n");
 			$this->response($response);
 		}
 
@@ -461,7 +542,7 @@ class Api extends CI_Controller
 		$result = json_decode($resp,true);
 
 		// log response
-		$this->log(date('Y-m-d H:i:s')."[Login TMONEY] Response $resp \t\n");
+		$this->log(date('Y-m-d H:i:s')."[LOGIN][TMONEY] Response $resp \t\n");
 		
 		if (SHOW_DEBUG_API) 
 		{
@@ -471,12 +552,81 @@ class Api extends CI_Controller
 
 		// statement for failed
 		if ($result['resultCode'] != "0" || $result['resultCode'] != "00") {
-				# gagal
+			$response = ["status" => "failed", "message" => $result['resultDesc'], "err_no" => $result['resultCode']];
+			$this->log(date('Y-m-d H:i:s')."[WARNING][LOGIN-TMONEY] Error {$result['resultCode']}, Message {$result['resultDesc']}\t\n");
+			$this->response($response);
 		}
 
 		return $result;
     }
 
+    public function action_dimo_login_tmoney()
+    {
+    	// hit API LOGIN TMONEY
+		$url_api_login = "https://prodapi-app.tmoney.co.id/api/sign-in";
+
+		$curl 	= curl_init();
+
+		curl_setopt_array($curl, array(
+			CURLOPT_RETURNTRANSFER 	=> 1,
+			CURLOPT_URL 			=> $url_api_login,
+			CURLOPT_TIMEOUT 		=> 25, 
+			CURLOPT_POSTFIELDS => array(
+			    'userName' => "ekoselaluceria@gmail.com",
+			    'password' => "Malang14",
+			    'terminal' => "ANDROID-TMONEY",
+			),
+			CURLOPT_SSL_VERIFYHOST 	=> 1,
+			CURLOPT_SSL_VERIFYPEER 	=> false,
+		));
+
+		$resp   = curl_exec($curl);
+		$error_no = curl_errno($curl);
+
+		// log post login tmoney
+		$this->log(date('Y-m-d H:i:s')."[LOGIN][TMONEY] POST userName: ekoselaluceria@gmail.com, password : Malang14\t\n");
+			
+		// Check if any error occurred
+		if(curl_errno($curl) == 28)
+		{
+			$response = ["status" => "failed", "message" => "OPERATION TIME OUT", "err_no" => 28];
+			$this->log(date('Y-m-d H:i:s')."[WARNING] Operation time out when login at tmoney\t\n");
+			$this->response($response);
+		}
+
+		curl_close($curl);
+		
+		
+		$result = json_decode($resp,true);
+
+		// log response
+		$this->log(date('Y-m-d H:i:s')."[LOGIN][TMONEY] Response $resp \t\n");
+		
+		if (SHOW_DEBUG_API) 
+		{
+			echo "\n\nResponse API LOGIN DIMO \n";
+			echo json_encode($result,JSON_PRETTY_PRINT);
+		}
+
+		// statement for failed
+		if ($result['resultCode'] != "0" || $result['resultCode'] != "00") {
+			$response = ["status" => "failed", "message" => $result['resultDesc'], "err_no" => $result['resultCode']];
+			$this->log(date('Y-m-d H:i:s')."[WARNING][LOGIN-TMONEY] Error {$result['resultCode']}, Message {$result['resultDesc']}\t\n");
+			$this->response($response);
+		}
+
+		return $result;
+    }
+
+    public function add_decimal($val)
+    {
+    	$length = strlen($val);
+    	$price 	= substr($val,0,$length-2);
+    	$suffix = substr($val,$length-2,2);
+    	$result = $price.".".$suffix;
+
+    	return $result;
+    }
     /*public function action_tmoney_login()
     {
     	header("Content-Type : application/json");
