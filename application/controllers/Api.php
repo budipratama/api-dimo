@@ -226,7 +226,7 @@ class Api extends CI_Controller
 				    ),
 				    CURLOPT_POSTFIELDS => $data_string,
 				));
-				dsa
+				
 				// Check if any error occurred
 				if(curl_errno($curl))
 				{
