@@ -2,22 +2,18 @@
 $username 	= 'Dimo';
 $password 	= 'DimoMantapSepanjangMasa';
 $curl   = curl_init();
-$url    =   "http://localhost/api-dimo/index.php/api_master/user";
-$url 	=	"http://devapi.tmoney.co.id/api/sign-in";
+$url 	=	"http://localhost/api-dimo/index.php/api/action_inquiry";
 // $url 	=	"http://localhost/api-dimo/get_all_header.php";
 // $url 	=	"https://sandbox.flashiz.co.id/oauth/v1/as/request/AppOauth?ID=TOKENREQ&host_id=BKKBIDJA";
 
 curl_setopt_array($curl, array(
     CURLOPT_RETURNTRANSFER => 1,
     CURLOPT_URL => $url,
-    // CURLOPT_USERPWD => $username.":".$password,
+    CURLOPT_USERPWD => $username.":".$password,
     CURLOPT_CONNECTTIMEOUT => 30, 
     CURLOPT_POST => 1,
-    CURLOPT_HTTPHEADER => 1,
     CURLOPT_POSTFIELDS => array(
-        'userName' => "ekoselaluceria@gmail.com",
-        'password' => "T3lkom123",
-        'terminal' => "ANDROID-TMONEY",
+        'id' => 5,
     ),
     CURLOPT_HTTPHEADER => array(
     	'Content-Type: application/json',
@@ -27,13 +23,10 @@ curl_setopt_array($curl, array(
     CURLOPT_SSL_VERIFYPEER => false,
 ));
 
-$resp   = curl_exec($curl);
-$error_no = curl_errno($curl);
-echo "\nresult";
-print_r($resp);
-// Check if any error occurred
-if(curl_errno($curl))
-{echo curl_errno($curl)."\n";
-    echo 'Curl error: Time out '.curl_error($curl);
-}
-curl_close($curl);
+$server_output = curl_exec ($curl);
+// $header = curl_getinfo($curl,CURLINFO_HEADER_SIZE);
+curl_close ($curl);
+echo $server_output;
+print_r(json_decode($server_output, true));
+/*$c = '{"content":"e3690c0dcc1e8f67dce45c9b753fcda9724b403757856fff70fdf8ec5c3ce024","message":"Token Was Create","status":"success"}';
+print_r(json_decode($c,true));*/

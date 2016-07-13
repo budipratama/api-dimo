@@ -1,0 +1,12 @@
+$contents   = [
+                ["id"=>"DE4","value" => "13500"],// jumlah pembayaran
+                // ["id"=>"DE7","value"=> date('mdhis')],// Transmission Date and Time (GMT)
+                // ["id"=>"DE32","value"=>"912"],//Acquiring institution identification code 
+                // ["id"=>"DE33","value"=>"912"],//Forwarding institution code 
+                ["id"=>"DE43","value"=>"Salon Meicy"],//Card acceptor name/location – QR payment value is store name a
+                ["id"=>"DE48","value"=>"8a14acf8cef8bd2ee13bc76d018f5b271defcc8a"],// User API Key
+                ["id"=>"DE54","value"=>"0"],//Tipping Amount. With 2 (two) decimal places. 
+                //["id"=>"DE61","value"=>"cqmWWFWsOILw"], //Reserved – Private, information of the invoice ID. 
+                ["id"=>"DE62","value"=>"000000000000000000000000000000000000000"], //
+                ["id"=>"DE98","value"=>"02"],// Product Code – for each issuer, this value will be different.
+            ];

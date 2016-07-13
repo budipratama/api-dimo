@@ -1,10 +1,15 @@
 <?php
+$username 	= 'Dimo';
+$password 	= 'DimoMantapSepanjangMasa';
+$url 		= "http://localhost/api-dimo/index.php/api/users";
+
 // Get cURL resource
 $curl = curl_init();
 // Set some options - we are passing in a useragent too here
 curl_setopt_array($curl, array(
     CURLOPT_RETURNTRANSFER => 1,
-    CURLOPT_URL => 'http://localhost/api-dimo/index.php/api/users',
+    CURLOPT_URL => $url,
+    CURLOPT_USERPWD => $username.":".$password,
     CURLOPT_USERAGENT => 'Codular Sample cURL Request'
 ));
 // Send the request & save response to $resp
