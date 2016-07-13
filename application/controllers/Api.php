@@ -13,7 +13,14 @@ class Api extends CI_Controller
 	protected $userName;
 	protected $password;
 	protected $paidAmmount;
+	protected $trans_id;
 	
+	public function __construct()
+	{
+		parent::__construct();
+		$this->load->database();
+	}
+
 	public function authentication()
 	{
 		header('WWW-Authenticate: Basic realm="My Realm"');
@@ -148,6 +155,11 @@ class Api extends CI_Controller
 		return json_decode($resp,true);
 	}
 
+	public function save_transaction($data)
+	{
+		$this->db->insert('tbl_transaction_history',$data);
+	}
+
 	public function action_inquiry()
     {
     	header('Content-Type: application/json');
@@ -164,6 +176,8 @@ class Api extends CI_Controller
 		{
 			if ($_SERVER['PHP_AUTH_USER'] == USERNAME_API && $_SERVER['PHP_AUTH_PW'] == PASSWORD_API) 
 			{
+				$this->trans_id = date('YmdHis').rand(1,10000000);
+
 				$requestBody  = file_get_contents('php://input');
 	    		// recorded transaction in log (username, password and request body)
 	    		$this->log(date('Y-m-d H:i:s')."[LOGIN] IP : {$_SERVER['HTTP_HOST']} \tUsername : $user \tPassword : $pass\t\n");
@@ -226,7 +240,7 @@ class Api extends CI_Controller
 				}
 				
 				$this->log(date('Y-m-d H:i:s')."[INQUIRY] Request body inquiry : $data_string\t\n",PATH_LOG.'logs/transaction__'.date('Y-m-d').'.log');
-				
+
 				$url 	= "https://sandbox.flashiz.co.id/oauth/v1/as/request/AppOauth?ID=AUTHREQ&trxid=requestInquiry&host_id=TLKMIDJA";
 				$curl 	= curl_init();
 
@@ -266,7 +280,8 @@ class Api extends CI_Controller
 					echo "\n\nResponse inquiry\n";
 					echo json_encode($result,JSON_PRETTY_PRINT);
 				}
-				
+				$this->log(date('Y-m-d H:i:s')."[INQUIRY] Response body inquiry : $resp\t\n",PATH_LOG.'logs/transaction__'.date('Y-m-d').'.log');
+				$this->save_transaction(['date'=>'NOW()','trans_id'=>$this->trans_id,'api'=>'INQUIRY','request_body'=>$data_string,'response_body'=>$resp,'ip'=>$_SERVER['HTTP_HOST']]);
 				// response negatif
 				if ($result['items'][9]['value'] != "00") 
 				{
@@ -276,7 +291,6 @@ class Api extends CI_Controller
 				}
 				
 				$login 		= $this->action_user_login_tmoney();
-				// $this->action_dimo_login_tmoney();
 				$resp_topup = $this->action_topup_balance($login['user']['idTmoney'],$login['user']['idFusion'],$login['user']['token'],$content['pinCode']);
 				
 				$this->action_acknowledgment($result['items'][6]['value'],$result['items'][3]['value'],$result['items'][4]['value'],$result['items'][5]['value'],$resp_topup['reffNo'],$content['merchantName'],$content['userAPIKey'],$content['tipAmount'],$invoiceID['invoiceId'],$content['discAmount'],$content['NOC'],$de62);
@@ -332,6 +346,8 @@ class Api extends CI_Controller
 
 		$data_string = json_encode($data,true);
     	
+    	$this->log(date('Y-m-d H:i:s')."[ACKNOWLEDGMENT] Request body inquiry : $data_string\t\n",PATH_LOG.'logs/transaction__'.date('Y-m-d').'.log');
+
     	if (SHOW_DEBUG_API) 
 		{
 			echo "\n\nRequest body acknowledgment\n";
@@ -375,7 +391,8 @@ class Api extends CI_Controller
 			echo "\n\nResponse acknowledgment\n";
 			echo json_encode($result,JSON_PRETTY_PRINT);	
 		}
-
+		$this->log(date('Y-m-d H:i:s')."[ACKNOWLEDGMENT] Response body inquiry : $resp\t\n",PATH_LOG.'logs/transaction__'.date('Y-m-d').'.log');
+		$this->save_transaction(['date'=>'NOW()','trans_id'=>$this->trans_id,'api'=>'ACKNOWLEDGMENT','request_body'=>$data_string,'response_body'=>$resp,'ip'=>$_SERVER['HTTP_HOST']]);
 		// response negatif
 		if ($result['items'][9]['value'] != "00") 
 		{
@@ -383,7 +400,7 @@ class Api extends CI_Controller
 			$this->log(date('Y-m-d H:i:s')."[ACKNOWLEDGMENT] Response Negatif error {$result['items'][9]['value']}\t\n");
 			$this->response($response);
 		}
-
+		
     }
 
     public function action_topup_balance($idTmoney,$idFusion,$token,$pin)
@@ -443,6 +460,7 @@ class Api extends CI_Controller
 			$this->response($response);
 		}
 
+		$this->save_transaction(['date'=>'NOW()','trans_id'=>$this->trans_id,'api'=>'TOPUP-BALANCE','request_body'=>"POST transactionType 1, idTmoney $idTmoney, idFusion $idFusion, token $token, destAccount ekoselaluceria@gmail.com, amount {$this->paidAmmount}",'response_body'=>$resp,'ip'=>$_SERVER['HTTP_HOST']]);
 		// step 2
 		$curl 	= curl_init();
 
@@ -499,6 +517,9 @@ class Api extends CI_Controller
 			$this->log(date('Y-m-d H:i:s')."[WARNING][TOPUP-BALANCE] Error {$result['resultCode']}, Message {$result['resultDesc']}\t\n");
 			$this->response($response);
 		}
+
+		$this->save_transaction(['date'=>'NOW()','trans_id'=>$this->trans_id,'api'=>'TOPUP-BALANCE','request_body'=>"POST transactionType 2, idTmoney $idTmoney, idFusion $idFusion, token $token, destAccount ekoselaluceria@gmail.com, amount {$this->paidAmmount}, pin $pin, transactionID {$result['transactionID']}, refNo {$result['refNo']}",'response_body'=>$resp,'ip'=>$_SERVER['HTTP_HOST']]);
+
 		return $result;
     }
 
@@ -556,11 +577,11 @@ class Api extends CI_Controller
 			$this->log(date('Y-m-d H:i:s')."[WARNING][LOGIN-TMONEY] Error {$result['resultCode']}, Message {$result['resultDesc']}\t\n");
 			$this->response($response);
 		}
-
+		$this->save_transaction(['date'=>'NOW()','trans_id'=>$this->trans_id,'api'=>'LOGIN-TMONEY','request_body'=>"POST userName: {$this->userName}, password : {$this->password}",'response_body'=>$resp,'ip'=>$_SERVER['HTTP_HOST']]);
 		return $result;
     }
 
-    public function action_dimo_login_tmoney()
+    /*public function action_dimo_login_tmoney()
     {
     	// hit API LOGIN TMONEY
 		$url_api_login = "https://prodapi-app.tmoney.co.id/api/sign-in";
@@ -616,7 +637,7 @@ class Api extends CI_Controller
 		}
 
 		return $result;
-    }
+    }*/
 
     public function add_decimal($val)
     {
