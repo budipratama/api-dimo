@@ -12,9 +12,9 @@ class Mobile extends CI_Controller{
 		$url        = "http://localhost/api-dimo/api/inquiry";
 
 		$contents   = [
-		                ["id" => "paidAmmount", "value" => "10"],// Paid Payment
+		                ["id" => "paidAmmount", "value" => "10000000"],// Paid Payment
 		                ["id" => "merchantName", "value"=> "Salon Meicy"],//Card acceptor name/location – QR payment value is store name a
-		                ["id" => "userAPIKey", "value"=> "9f5da2b9200d20fe048d76e91d7038885cad9042"],// User API Key
+		                ["id" => "userAPIKey", "value"=> "9a2b9c40c167d58af112965340d84535d2ecfee4"],// User API Key
 		                ["id" => "tipAmount", "value"=> "1"],//Tipping Amount. With 2 (two) decimal places. 
 		                ["id" => "discAmount", "value"=> "000000000000"], // Discount Amount length 12 
 		                ["id" => "NOC", "value"=> "000"],// number of coupons length 3
@@ -25,7 +25,7 @@ class Mobile extends CI_Controller{
 		                ["id" => "pinCode", "value"=> "137109"],// Pin Code 
 		                ["id" => "idTmoney","value" => "195100001470"],// ID Tmoney For TMONEY 
 		                ["id" => "idFusion","value" => "+6219565046162"],// ID Fusion For TMONEY 
-		                ["id" => "token","value" => "f6d48b7fff807b64605293005f30951f61c6790c3c9d500a5cd57fc6d9f59de83bb9183796e6887d"],// Username For TMONEY 
+		                ["id" => "token","value" => "546257923021e207b657ef98ce52b514316eb2a7151e00cad78142294756deeded558773d4bf4319"],// Username For TMONEY 
 		];
 
 		$data       = ["type"=>"inquiry","contents"=>$contents];

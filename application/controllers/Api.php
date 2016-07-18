@@ -147,6 +147,15 @@ class Api extends CI_Controller
 					$this->log(date('Y-m-d H:i:s')."[FAILED] JSON Format Incorret\t\n");
 					$this->response($response);	
 				}
+				
+				// $this->debug($this->checkUserApiKey($input['contents'][0]['value']));
+				$api = $this->checkUserApiKey($input['contents'][0]['value']);
+
+				if ($api != null) 
+				{
+					$data = ['status' => 'success','content' => $api->userApiKey];
+					$this->response($data);
+				}
 
 				$url    = "https://sandbox.flashiz.co.id/oauth/v1/as/request/AppOauth?ID=AUTHREQ&trxid=requestApikey&host_id=TLKMIDJA";
 				$curl 	= curl_init();
@@ -155,6 +164,7 @@ class Api extends CI_Controller
 						["id" => "DE32", "value" => "912"],// Acquiring institution identification code
 		                ["id" => "DE33", "value"=> "912"],// Forwarding institution code																
 				]; 
+
 				$data        = ["type"=>"requestApikey","contents"=>$contents];
 				$data_string = json_encode($data,true);
 
@@ -187,7 +197,7 @@ class Api extends CI_Controller
 				curl_close($curl);
 						
 				$result = json_decode($resp,true);
-						
+									
 				if (SHOW_DEBUG_API) 
 				{
 					echo "\n\nResponse Api Key\n";
@@ -196,8 +206,8 @@ class Api extends CI_Controller
 						
 						
 				$this->log(date('Y-m-d H:i:s')."[USER API KEY] Response Body Api Key : $resp\t\n",PATH_LOG.'logs/transaction__'.date('Y-m-d').'.log');
-				$this->insert_to_table('f_transaction_history_log',['date'=>date('Y-m-d H:i:s'),'trans_id'=>$this->trans_id,'type_request'=>'USER API KEY','request_body'=>$data_string,'response_body'=>$resp,'ip'=>$_SERVER['HTTP_HOST']]);
-				$this->insert_to_table('f_user_api_key',['idTmoney' => $input['contents'][0]['id'], 'userApiKey'=>$result['items'][9]['value']]);
+				$this->insert_to_table('f_transaction_history_log',['date' => date('Y-m-d H:i:s'), 'trans_id' => $this->trans_id, 'type_request' => 'USER API KEY','request_body' => $data_string, 'response_body' => $resp, 'ip' => $_SERVER['HTTP_HOST']]);
+				$this->insert_to_table('f_user_api_key',['idTmoney' => $input['contents'][0]['value'], 'userApiKey' => $result['items'][9]['value']]);
 			}
 			else
 			{
@@ -209,7 +219,13 @@ class Api extends CI_Controller
 		// response negatif
 	}
 
-	
+	public function checkUserApiKey($idTmoney)
+	{
+		$query = $this->db->get_where('f_user_api_key',['idTmoney' => $idTmoney]);
+		$result = $query->row();
+
+		return $result;
+	}
 
 	/**
 	 * Inquiry
@@ -344,7 +360,7 @@ class Api extends CI_Controller
 				}
 				
 				$this->log(date('Y-m-d H:i:s')."[INQUIRY] Response body inquiry : $resp\t\n",PATH_LOG.'logs/transaction__'.date('Y-m-d').'.log');
-				$this->insert_to_table('f_transaction_history_log',['userApiKey' => $content['userAPIKey'] , 'idTmoney' => $content['idTmoney'] , 'idFusion' => $content['idFusion'] , 'tokenCustomer' => $content['token'] , 'pin' => $content['pinCode'] , 'paidAmount' => $content['paidAmount'] , 'merchantName' => $content['merchantName'] , 'tipingAmount' => $content['tipAmount'] , 'generateInvoice' => $invoiceID['invoiceId'] , 'discountAmount' => $content[''] , 'numberOfCoupons' => $content[''] , 'discountType' => $content['discAmount'] , 'loyaltyName' => $content['loyaltyName'] , 'amountRedeemed' => $content['amountRedeemed'] , 'pointsRedeemed' => $content['pointsRedeemed'] , 'date'=> date('Y-m-d H:i:s'),'trans_id'=>$this->trans_id,'type_request'=>'INQUIRY','request_body'=>$data_string,'response_body'=>$resp,'ip'=>$_SERVER['REMOTE_ADDR']]);
+				$this->insert_to_table('f_transaction_history_log',['userApiKey' => $content['userAPIKey'] , 'idTmoney' => $content['idTmoney'] , 'idFusion' => $content['idFusion'] , 'tokenCustomer' => $content['token'] , 'pin' => $content['pinCode'] , 'paidAmount' => $content['paidAmount'] , 'merchantName' => $content['merchantName'] , 'tipingAmount' => $content['tipAmount'] , 'generateInvoice' => $invoiceID['invoiceId'] , 'discountAmount' => $content['discAmount'] , 'numberOfCoupons' => $content['NOC'] , 'discountType' => $content['discType'] , 'loyaltyName' => $content['loyaltyName'] , 'amountRedeemed' => $content['amountRedeemed'] , 'pointsRedeemed' => $content['pointsRedeemed'] , 'date'=> date('Y-m-d H:i:s'),'trans_id'=>$this->trans_id,'type_request'=>'INQUIRY','request_body'=>$data_string,'response_body'=>$resp,'ip'=>$_SERVER['REMOTE_ADDR']]);
 				
 				// response negatif
 				if ($result['items'][9]['value'] != "00") 
@@ -356,7 +372,7 @@ class Api extends CI_Controller
 				
 				$resp_topup = $this->action_topup_balance($content['idTmoney'],$content['idFusion'],$content['token'],$content['pinCode']);
 				
-				$this->action_acknowledgment($result['items'][6]['value'],$result['items'][3]['value'],$result['items'][4]['value'],$result['items'][5]['value'],$resp_topup['reffNo'],$content['merchantName'],$content['userAPIKey'],$content['tipAmount'],$invoiceID['invoiceId'],$content['discAmount'],$content['NOC'],$de62);
+				$this->action_acknowledgment($result['items'][6]['value'],$result['items'][3]['value'],$result['items'][4]['value'],$result['items'][5]['value'],$resp_topup['reffNo'],$content['merchantName'],$content['userAPIKey'],$content['tipAmount'],$invoiceID['invoiceId'],$de62);
 			}
 			else
 			{
@@ -407,7 +423,7 @@ class Api extends CI_Controller
 
 		$data 	= ['type' => "requestPayment","contents" => $contents];
 		
-		// $this->insert_to_table('f_transaction_history_log',['date'=> date('Y-m-d H:i:s'),'trans_id'=>$this->trans_id,'type_request'=>'ACKNOWLEDGMENT','request_body'=>$data_string,'response_body'=>$resp,'ip'=>$_SERVER['REMOTE_ADDR']]);
+		// $this->insert_to_table('f_transaction_history_log',['userApiKey' => $de48, 'paidAmount' => $this->paidAmount, 'merchantName' => $de43, 'tipingAmount' => $this->tipAmount, 'generateInvoice' => $de61, 'discountAmount' => $content[''], 'numberOfCoupons' => $content[''], 'discountType' => $content['discType'], 'loyaltyName' => $content['loyaltyName'] , 'amountRedeemed' => $content['amountRedeemed'] , 'pointsRedeemed' => $content['pointsRedeemed'] ,'date'=> date('Y-m-d H:i:s'),'trans_id'=>$this->trans_id,'type_request'=>'ACKNOWLEDGMENT','request_body'=>$data_string,'response_body'=>$resp,'ip'=>$_SERVER['REMOTE_ADDR']]);
 
 		$data_string = json_encode($data,true);
     	
